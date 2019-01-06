@@ -312,19 +312,29 @@ class P2EPMaker(Maker):
         # args: (1) message, as string
         # returns: True or False
         self.user_check = self.default_user_check
+        self.user_info = self.default_user_info_callback
 
     def default_user_check(self, message):
         if input(message) == 'y':
             return True
         return False
 
+    def default_user_info_callback(self, message):
+        """ TODO this is basically the same function
+        as taker_info_callback (currently used for GUI);
+        fold this and some other convenience functions together
+        and use a root CJPeer class in jmbase to avoid code
+        duplication.
+        """
+        jlog.info(message)
+
     def inform_user_details(self):
-        jlog.info("Your receiving address is: " + self.destination_addr)
-        jlog.info("You will receive amount: " + str(
+        self.user_info("Your receiving address is: " + self.destination_addr)
+        self.user_info("You will receive amount: " + str(
             self.receiving_amount) + " satoshis.")
-        jlog.info("The sender also needs to know your ephemeral "
+        self.user_info("The sender also needs to know your ephemeral "
                   "nickname: " + jm_single().nickname)
-        jlog.info("This information has been stored in a file payjoin.txt;"
+        self.user_info("This information has been stored in a file payjoin.txt;"
                   " send it to your counterparty when you are ready.")
         with open("payjoin.txt", "w") as f:
             f.write("Payjoin transfer details:\n\n")
@@ -368,10 +378,10 @@ class P2EPMaker(Maker):
         pass
 
     def on_tx_unconfirmed(self, txd, txid):
-        jlog.info("The transaction has been broadcast.")
-        jlog.info("Txid is: " + txid)
-        jlog.info("Transaction in detail: " + pprint.pformat(txd))
-        jlog.info("shutting down.")
+        self.user_info("The transaction has been broadcast.")
+        self.user_info("Txid is: " + txid)
+        self.user_info("Transaction in detail: " + pprint.pformat(txd))
+        self.user_info("shutting down.")
         reactor.stop()
 
     def on_tx_confirmed(self, offer, confirmations, txid):
@@ -407,7 +417,7 @@ class P2EPMaker(Maker):
             tx = btc.deserialize(txhex)
         except (IndexError, SerializationError, SerializationTruncationError) as e:
             return (False, 'malformed txhex. ' + repr(e))
-        jlog.info('obtained tx proposal from sender:\n' + pprint.pformat(tx))
+        self.user_info('obtained tx proposal from sender:\n' + pprint.pformat(tx))
 
         if len(tx["outs"]) != 2:
             return (False, "Transaction has more than 2 outputs; not supported.")
@@ -454,7 +464,7 @@ class P2EPMaker(Maker):
         # included fee is within 0.3-3x our own current estimates, if not user
         # must decide.
         btc_fee = total_sender_input - self.receiving_amount - proposed_change_value
-        jlog.info("Network transaction fee is: " + str(btc_fee) + " satoshis.")
+        self.user_info("Network transaction fee is: " + str(btc_fee) + " satoshis.")
         fee_est = estimate_tx_fee(len(tx['ins']), len(tx['outs']),
                                   txtype=self.wallet.get_txtype())
         fee_ok = False
@@ -488,7 +498,7 @@ class P2EPMaker(Maker):
                 try:
                     ver_sig, ver_pub = tx["ins"][u[0]]["txinwitness"]
                 except Exception as e:
-                    jlog.info("Segwit error: " + repr(e))
+                    self.user_info("Segwit error: " + repr(e))
                     return (False, "Segwit input not of expected type, "
                             "either p2sh-p2wpkh or p2wpkh")
                 # note that the scriptCode is the same whether nested or not
@@ -512,9 +522,9 @@ class P2EPMaker(Maker):
 
         # At this point we are satisfied with the proposal. Record the fallback
         # in case the sender disappears and the payjoin tx doesn't happen:
-        jlog.info("We'll use this serialized transaction to broadcast if your"
+        self.user_info("We'll use this serialized transaction to broadcast if your"
                   " counterparty fails to broadcast the payjoin version:")
-        jlog.info(txhex)
+        self.user_info(txhex)
         # Keep a local copy for broadcast fallback:
         self.fallback_tx = txhex
 
@@ -539,7 +549,7 @@ class P2EPMaker(Maker):
             # have some reasonable lower limit but otherwise choose
             # randomly; note that this is actually a great way of
             # sweeping dust ...
-            jlog.info("Choosing one coin at random")
+            self.user_info("Choosing one coin at random")
             old_selector = self.wallet._utxos.selector
             self.wallet._utxos.selector = select_one_utxo
             try:
@@ -560,32 +570,32 @@ class P2EPMaker(Maker):
                 not_uih2 = True
             except Exception:
                 # TODO probably not logical to always sweep here.
-                jlog.info("Sweeping all coins in this mixdepth.")
+                self.user_info("Sweeping all coins in this mixdepth.")
                 try:
                     my_utxos = self.wallet.get_utxos_by_mixdepth()[self.mixdepth]
                 except:
                     return self.no_coins_fallback()
         if not_uih2:
-            jlog.info("The proposed tx does not trigger UIH2, which "
+            self.user_info("The proposed tx does not trigger UIH2, which "
                       "means it is indistinguishable from a normal "
                       "payment. This is the ideal case. Continuing..")
         else:
-            jlog.info("The proposed tx does trigger UIH2, which it makes "
+            self.user_info("The proposed tx does trigger UIH2, which it makes "
                       "it somewhat distinguishable from a normal payment,"
                       " but proceeding with payjoin..")
 
         my_total_in = sum([va['value'] for va in my_utxos.values()])
-        jlog.info("We selected inputs worth: " + str(my_total_in))
+        self.user_info("We selected inputs worth: " + str(my_total_in))
         # adjust the output amount at the destination based on our contribution
         new_destination_amount = self.receiving_amount + my_total_in
         # estimate the required fee for the new version of the transaction
         total_ins = len(tx["ins"]) + len(my_utxos.keys())
         est_fee = estimate_tx_fee(total_ins, 2, txtype=self.wallet.get_txtype())
-        jlog.info("We estimated a fee of: " + str(est_fee))
+        self.user_info("We estimated a fee of: " + str(est_fee))
         new_change_amount = total_sender_input + my_total_in - \
             new_destination_amount - est_fee
-        jlog.info("We calculated a new change amount of: " + str(new_change_amount))
-        jlog.info("We calculated a new destination amount of: " + str(new_destination_amount))
+        self.user_info("We calculated a new change amount of: " + str(new_change_amount))
+        self.user_info("We calculated a new destination amount of: " + str(new_destination_amount))
         # now reconstruct the transaction with the new inputs and the
         # amount-changed outputs
         new_outs = [{"address": self.destination_addr,
@@ -629,22 +639,22 @@ class P2EPMaker(Maker):
         """ Broadcast, optionally, the fallback non-coinjoin transaction
         because we were not able to select coins to contribute.
         """
-        jlog.info("Unable to select any coins; this mixdepth is empty.")
+        self.user_info("Unable to select any coins; this mixdepth is empty.")
         if self.user_check("Would you like to broadcast the non-coinjoin payment?"):
             self.broadcast_fallback()
             return (False, "Coinjoin unsuccessful, fallback attempted.")
         else:
-            jlog.info("You chose not to broadcast; the payment has NOT been made.")
+            self.user_info("You chose not to broadcast; the payment has NOT been made.")
             return (False, "No transaction made.")
 
     def broadcast_fallback(self):
-        jlog.info("Broadcasting non-coinjoin fallback transaction.")
+        self.user_info("Broadcasting non-coinjoin fallback transaction.")
         txid = btc.txhash(self.fallback_tx)
         success = jm_single().bc_interface.pushtx(self.fallback_tx)
         if not success:
-            jlog.info("ERROR: the fallback transaction did not broadcast. "
+            self.user_info("ERROR: the fallback transaction did not broadcast. "
                       "The payment has NOT been made.")
         else:
-            jlog.info("Payment received successfully, but it was NOT a coinjoin.")
-            jlog.info("Txid: " + txid)
+            self.user_info("Payment received successfully, but it was NOT a coinjoin.")
+            self.user_info("Txid: " + txid)
         reactor.stop()
