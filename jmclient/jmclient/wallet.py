@@ -181,12 +181,13 @@ class UTXOManager(object):
 
         self._utxo[mixdepth][(txid, index)] = (path, value)
 
-    def select_utxos(self, mixdepth, amount, utxo_filter=()):
+    def select_utxos(self, mixdepth, amount, utxo_filter=(), select_fn=None):
         assert isinstance(mixdepth, numbers.Integral)
         utxos = self._utxo[mixdepth]
         available = [{'utxo': utxo, 'value': val}
             for utxo, (addr, val) in utxos.items() if utxo not in utxo_filter]
-        selected = self.selector(available, amount)
+        selector = select_fn or self.selector
+        selected = selector(available, amount)
         return {s['utxo']: {'path': utxos[s['utxo']][0],
                             'value': utxos[s['utxo']][1]}
                 for s in selected}
@@ -564,12 +565,12 @@ class BaseWallet(object):
         self._utxos.add_utxo(txid, index, path, value, mixdepth)
 
     @deprecated
-    def select_utxos(self, mixdepth, amount, utxo_filter=None):
+    def select_utxos(self, mixdepth, amount, utxo_filter=None, select_fn=None):
         utxo_filter_new = None
         if utxo_filter:
             utxo_filter_new = [(unhexlify(utxo[:64]), int(utxo[65:]))
                                for utxo in utxo_filter]
-        ret = self.select_utxos_(mixdepth, amount, utxo_filter_new)
+        ret = self.select_utxos_(mixdepth, amount, utxo_filter_new, select_fn)
         ret_conv = {}
         for utxo, data in ret.items():
             addr = self.get_addr_path(data['path'])
@@ -577,7 +578,8 @@ class BaseWallet(object):
             ret_conv[utxo_txt] = {'address': addr, 'value': data['value']}
         return ret_conv
 
-    def select_utxos_(self, mixdepth, amount, utxo_filter=None):
+    def select_utxos_(self, mixdepth, amount, utxo_filter=None,
+                      select_fn=None):
         """
         Select a subset of available UTXOS for a given mixdepth whose value is
         greater or equal to amount.
@@ -600,7 +602,8 @@ class BaseWallet(object):
             assert len(i) == 2
             assert isinstance(i[0], bytes)
             assert isinstance(i[1], numbers.Integral)
-        ret = self._utxos.select_utxos(mixdepth, amount, utxo_filter)
+        ret = self._utxos.select_utxos(
+            mixdepth, amount, utxo_filter, select_fn)
 
         for data in ret.values():
             data['script'] = self.get_script_path(data['path'])

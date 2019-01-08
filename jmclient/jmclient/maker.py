@@ -550,14 +550,12 @@ class P2EPMaker(Maker):
             # randomly; note that this is actually a great way of
             # sweeping dust ...
             self.user_info("Choosing one coin at random")
-            old_selector = self.wallet._utxos.selector
-            self.wallet._utxos.selector = select_one_utxo
             try:
-                my_utxos = self.wallet.select_utxos(self.mixdepth,
-                                                    jm_single().DUST_THRESHOLD)
+                my_utxos = self.wallet.select_utxos(
+                    self.mixdepth,  jm_single().DUST_THRESHOLD,
+                    select_fn=select_one_utxo)
             except:
                 return self.no_coins_fallback()
-            self.wallet._utxos.selector = old_selector
             not_uih2 = True
         else:
             # get an approximate required amount assuming 4 inputs, which is
