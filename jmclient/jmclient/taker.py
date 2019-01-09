@@ -1076,8 +1076,9 @@ class P2EPTaker(Taker):
                 continue
             retrieve_utxos[ctr] = [index, utxo_for_checking]
             ctr += 1
+        # we always accept unconf utxos from receiver; it's their payment:
         utxo_data = jm_single().bc_interface.query_utxo_set(
-            [x[1] for x in retrieve_utxos.values()])
+            [x[1] for x in retrieve_utxos.values()], includeunconf=True)
 
         # Next we'll verify each of the counterparty's inputs,
         # while at the same time gathering the total they spent.
