@@ -19,7 +19,7 @@ from jmclient import Taker, P2EPTaker, load_program_config, get_schedule,\
     sync_wallet, RegtestBitcoinCoreInterface, estimate_tx_fee, direct_send,\
     open_test_wallet_maybe, get_wallet_path
 from twisted.python.log import startLogging
-from jmbase.support import get_log
+from jmbase.support import get_log, set_logging_level
 from cli_options import get_sendpayment_parser, get_max_cj_fee_values
 
 log = get_log()
@@ -223,6 +223,10 @@ def main():
             reactor.stop()
 
     if options.p2ep:
+        # This workflow requires command line reading; we force info level logging
+        # to remove noise, and mostly communicate to the user with the fn
+        # log.info (directly or via default taker_info_callback).
+        set_logging_level("INFO")
         taker = P2EPTaker(options.p2ep, wallet, schedule,
                           callbacks=(None, None, None))
     else:

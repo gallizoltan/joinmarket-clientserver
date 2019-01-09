@@ -7,7 +7,7 @@ from optparse import OptionParser
 
 import sys
 from twisted.python.log import startLogging
-from jmbase import get_log
+from jmbase import get_log, set_logging_level
 from jmclient import P2EPMaker, jm_single, load_program_config, \
     sync_wallet, JMClientProtocolFactory, start_reactor, \
     open_test_wallet_maybe, get_wallet_path
@@ -49,6 +49,11 @@ def receive_payjoin_main(makerclass):
         parser.error("Receiving amount must be a positive integer in satoshis")
         sys.exit(0)
     load_program_config()
+
+    # This workflow requires command line reading; we force info level logging
+    # to remove noise, and mostly communicate to the user with the fn
+    # log.info (via P2EPMaker.user_info).
+    set_logging_level("INFO")
 
     wallet_path = get_wallet_path(wallet_name, 'wallets')
     max_mix_depth = max([options.mixdepth, options.amtmixdepths - 1])
