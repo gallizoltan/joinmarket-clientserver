@@ -1,12 +1,10 @@
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 from builtins import * # noqa: F401
-from future.utils import iteritems
 
-import sys
 import logging
 from getpass import getpass
-import chromalog
+
 from chromalog.log import (
     ColorizingStreamHandler,
     ColorizingFormatter,
@@ -16,8 +14,8 @@ from colorama import Fore, Back, Style
 
 # magic; importing e.g. 'info' actually instantiates
 # that as a function that uses the color map
-# defined below.
-from chromalog.mark.helpers.simple import (
+# defined below. ( noqa because flake doesn't understand)
+from chromalog.mark.helpers.simple import (  # noqa: F401
     debug,
     info,
     important,
@@ -59,7 +57,6 @@ debug_silence = [False]
 #TODO pass this through from client, bitcoin paramater:
 DUST_THRESHOLD = 2730
 
-#consoleHandler = logging.StreamHandler(stream=sys.stdout)
 class JoinMarketStreamHandler(ColorizingStreamHandler):
 
     def __init__(self):
